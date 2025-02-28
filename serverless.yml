@@ -1,0 +1,54 @@
+# Define o nome do serviço e a versão do framework Serverless que será usada
+service: security-headers-article-domain
+frameworkVersion: '4'
+
+# Configuração do provedor AWS
+provider:
+  name: aws  # Define a AWS como provedor de nuvem
+  runtime: nodejs22.x  # Define a versão do Node.js para executar a função Lambda
+  region: us-east-1  # Especifica a região onde a função será implantada
+  memorySize: 128  # Define a quantidade de memória alocada para a função Lambda
+
+# Definição das funções Lambda
+functions:
+  api:
+    handler: handler.invoke  # Especifica o arquivo e a função de entrada da Lambda
+    role: !GetAtt BasicLambdaEdgeExecutionRole.Arn  # Associa a função Lambda a um papel IAM
+    events:
+      - preExistingCloudFront:  # Vincula a função Lambda@Edge a uma distribuição CloudFront existente
+          distributionId:  # ID da distribuição do CloudFront, aqui você vai inserir o ID da distribuição que criamos
+          eventType: origin-response  # Define que a função será acionada na resposta da origem
+          pathPattern: '*'  # Aplica a função a todas as solicitações
+          includeBody: false  # Indica que o corpo da resposta não será incluído
+
+# Definição de recursos adicionais
+resources:
+  Resources:
+    BasicLambdaEdgeExecutionRole:  # Criação da role IAM para a Lambda@Edge
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: basicLambdaEdgeExecutionRole  # Nome da role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - edgelambda.amazonaws.com  # Permite que a Lambda@Edge assuma essa role
+                  - lambda.amazonaws.com  # Permite que a Lambda normal assuma essa role
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: BasicLambdaEdgeExecutionPolicy  # Nome da política anexada à role
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup  # Permite criar grupos de logs no CloudWatch
+                    - logs:CreateLogStream  # Permite criar streams de logs
+                    - logs:PutLogEvents  # Permite gravar eventos de log
+                  Resource: arn:aws:logs:*:*:*  # Aplica permissões a todos os logs na conta
+
+# Lista de plugins utilizados
+plugins:
+  - serverless-lambda-edge-pre-existing-cloudfront  # Plugin que facilita a vinculação de Lambda@Edge a distribuições CloudFront existentes
